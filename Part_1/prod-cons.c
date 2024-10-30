@@ -9,12 +9,12 @@
 typedef struct
 {
     unsigned int buffer[BUFFER_SIZE];
-    int head; // Index for removing elements (consumer)
-    int tail; // Index for inserting elements (producer)
-    int count;
-    pthread_mutex_t mutex;
-    pthread_cond_t not_full;
-    pthread_cond_t not_empty;
+    int head;
+    int tail;
+    int count;                // Number of elements in buffer at any given time, important variable to check if buffer is full or empty
+    pthread_mutex_t mutex;    // Mutex to protect buffer
+    pthread_cond_t not_full;  // Condition variable to signal when buffer is not full
+    pthread_cond_t not_empty; // Condition variable to signal when buffer is not empty
 } CircularBuffer;
 
 CircularBuffer cb;
@@ -36,42 +36,42 @@ void init_buffer()
 // Add element to buffer
 void produce(unsigned int item)
 {
-    pthread_mutex_lock(&cb.mutex);
+    pthread_mutex_lock(&cb.mutex); // Lock the mutex as we are going to modify the buffer
 
     while (cb.count == BUFFER_SIZE)
     {
-        pthread_cond_wait(&cb.not_full, &cb.mutex);
+        pthread_cond_wait(&cb.not_full, &cb.mutex); // Wait for buffer to become not full
     }
 
     cb.buffer[cb.tail] = item;
     cb.tail = (cb.tail + 1) % BUFFER_SIZE;
     cb.count++;
 
-    pthread_cond_signal(&cb.not_empty);
-    pthread_mutex_unlock(&cb.mutex);
+    pthread_cond_signal(&cb.not_empty); // Signal that buffer is not empty
+    pthread_mutex_unlock(&cb.mutex);    // Unlock the mutex
 }
 
-// Remove and return element from buffer
+// Remove element from buffer and write to output file
 unsigned int consume()
 {
-    pthread_mutex_lock(&cb.mutex);
+    pthread_mutex_lock(&cb.mutex); // Lock the mutex as we are going to modify the buffer
 
     while (cb.count == 0)
     {
         if (production_complete)
         {
-            pthread_mutex_unlock(&cb.mutex);
+            pthread_mutex_unlock(&cb.mutex); // Unlock the mutex before returning
             return 0;
         }
-        pthread_cond_wait(&cb.not_empty, &cb.mutex);
+        pthread_cond_wait(&cb.not_empty, &cb.mutex); // Wait for buffer to become not empty
     }
 
     unsigned int item = cb.buffer[cb.head];
     cb.head = (cb.head + 1) % BUFFER_SIZE;
     cb.count--;
 
-    pthread_cond_signal(&cb.not_full);
-    pthread_mutex_unlock(&cb.mutex);
+    pthread_cond_signal(&cb.not_full); // Signal that buffer is not full
+    pthread_mutex_unlock(&cb.mutex);   // Unlock the mutex
 
     // Write the current buffer state to output file
     fprintf(output_file, "Consumed:[%u],BufferState:[", item);
@@ -104,7 +104,7 @@ void *producer(void *arg)
         if (item == 0)
         {
             production_complete = 1;
-            pthread_cond_broadcast(&cb.not_empty); // Wake up consumer
+            pthread_cond_signal(&cb.not_empty); // Signal that buffer is not empty
             break;
         }
         produce(item);
