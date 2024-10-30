@@ -71,6 +71,7 @@ unsigned int consume()
     cb.count--;
 
     pthread_cond_signal(&cb.not_full);
+    pthread_mutex_unlock(&cb.mutex);
 
     // Write the current buffer state to output file
     fprintf(output_file, "Consumed:[%u],BufferState:[", item);
@@ -89,7 +90,7 @@ unsigned int consume()
     }
     fprintf(output_file, "]\n");
 
-    pthread_mutex_unlock(&cb.mutex);
+    // pthread_mutex_unlock(&cb.mutex);
     return item;
 }
 
