@@ -27,12 +27,61 @@ void cleanup_semaphores()
     sem_unlink("/output_lock_sem");
 }
 
+int initialize_semaphores()
+{
+    // Clean up any existing semaphores
+    sem_unlink("/counter_lock_sem");
+    sem_unlink("/write_lock_sem");
+    sem_unlink("/read_lock_sem");
+    sem_unlink("/output_lock_sem");
+
+    // Initialize semaphores
+    counter_lock = sem_open("/counter_lock_sem", O_CREAT | O_EXCL, 0644, 1);
+    if (counter_lock == SEM_FAILED)
+    {
+        perror("sem_open failed");
+        cleanup_semaphores();
+        return 1;
+    }
+
+    write_lock = sem_open("/write_lock_sem", O_CREAT | O_EXCL, 0644, 1);
+    if (write_lock == SEM_FAILED)
+    {
+        perror("sem_open failed");
+        cleanup_semaphores();
+        return 1;
+    }
+
+    read_lock = sem_open("/read_lock_sem", O_CREAT | O_EXCL, 0644, 1);
+    if (read_lock == SEM_FAILED)
+    {
+        perror("sem_open failed");
+        cleanup_semaphores();
+        return 1;
+    }
+
+    output_lock = sem_open("/output_lock_sem", O_CREAT | O_EXCL, 0644, 1);
+    if (output_lock == SEM_FAILED)
+    {
+        perror("sem_open failed");
+        cleanup_semaphores();
+        return 1;
+    }
+
+    // Clear output file
+    output_file = fopen("output-reader-pref.txt", "w");
+    fclose(output_file);
+
+    return 0;
+}
+
 void *reader(void *arg)
 {
     // your code here
+
     char buffer[100];
 
-    // Entry section
+    // Increment reader count
     sem_wait(counter_lock);
     reader_count++;
     int reader_num = reader_count;
@@ -43,32 +92,25 @@ void *reader(void *arg)
     }
     sem_post(counter_lock);
 
-    sem_wait(output_lock);
-
     // Output to file
+    sem_wait(output_lock);
     output_file = fopen("output-reader-pref.txt", "a");
     fprintf(output_file, "Reading,Number-of-readers-present:[%d]\n", reader_num);
     fclose(output_file);
-
     sem_post(output_lock);
 
-    // Critical section
+    // Read from shared file
     sem_wait(read_lock);
     shared_file = fopen("shared-file.txt", "r");
-    if (shared_file == NULL)
-    {
-        perror("fopen");
-        exit(EXIT_FAILURE);
-    }
     while (fgets(buffer, sizeof(buffer), shared_file) != NULL)
     {
         // Reading the file
     }
-    // sleep(1); // Simulate reading time
+    // sleep(1);
     fclose(shared_file);
     sem_post(read_lock);
 
-    // Exit section
+    // Decrement reader count
     sem_wait(counter_lock);
     reader_count--;
     if (reader_count == 0)
@@ -84,13 +126,13 @@ void *reader(void *arg)
 void *writer(void *arg)
 {
     // your code here
-    // Entry section
+
+    // Wait for readers to finish
     while (1)
     {
-        // Wait for readers to finish
         sem_wait(write_lock);
 
-        if (reader_count == 0)
+        if (reader_count == 0) // Break if no readers present, otherwise wait again
         {
             break;
         }
@@ -102,14 +144,11 @@ void *writer(void *arg)
     fprintf(output_file, "Writing,Number-of-readers-present:[0]\n");
     fclose(output_file);
 
-    // Critical section
+    // Write to shared file
     shared_file = fopen("shared-file.txt", "a");
     fprintf(shared_file, "Hello world!\n");
     fclose(shared_file);
-
-    // sleep(1); // Simulate writing time
-
-    // Exit section
+    // sleep(1);
     sem_post(write_lock);
 
     return NULL;
@@ -117,6 +156,12 @@ void *writer(void *arg)
 
 int main(int argc, char **argv)
 {
+    // Initialize semaphores
+    int init_status = initialize_semaphores();
+    if (init_status != 0)
+    {
+        return init_status;
+    }
 
     // Do not change the code below to spawn threads
     if (argc != 3)
@@ -124,49 +169,6 @@ int main(int argc, char **argv)
     int n = atoi(argv[1]);
     int m = atoi(argv[2]);
     pthread_t readers[n], writers[m];
-
-    // Clean up any existing semaphores
-    sem_unlink("/counter_lock_sem");
-    sem_unlink("/write_lock_sem");
-    sem_unlink("/read_lock_sem");
-    sem_unlink("/output_lock_sem");
-
-    // Initialize semaphores
-    counter_lock = sem_open("/counter_lock_sem", O_CREAT | O_EXCL, 0644, 1);
-    if (counter_lock == SEM_FAILED)
-    {
-        perror("sem_open counter_lock failed");
-        cleanup_semaphores();
-        return 1;
-    }
-
-    write_lock = sem_open("/write_lock_sem", O_CREAT | O_EXCL, 0644, 1);
-    if (write_lock == SEM_FAILED)
-    {
-        perror("sem_open write_lock failed");
-        cleanup_semaphores();
-        return 1;
-    }
-
-    read_lock = sem_open("/read_lock_sem", O_CREAT | O_EXCL, 0644, 1);
-    if (read_lock == SEM_FAILED)
-    {
-        perror("sem_open read_lock failed");
-        cleanup_semaphores();
-        return 1;
-    }
-
-    output_lock = sem_open("/output_lock_sem", O_CREAT | O_EXCL, 0644, 1);
-    if (output_lock == SEM_FAILED)
-    {
-        perror("sem_open output_lock failed");
-        cleanup_semaphores();
-        return 1;
-    }
-
-    // Clear output file
-    output_file = fopen("output-reader-pref.txt", "w");
-    fclose(output_file);
 
     // Create reader and writer threads
     for (int i = 0; i < n; i++)
