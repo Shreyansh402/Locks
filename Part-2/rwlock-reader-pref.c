@@ -85,11 +85,21 @@ void *writer(void *arg)
 {
     // your code here
     // Entry section
-    sem_wait(write_lock);
+    while (1)
+    {
+        // Wait for readers to finish
+        sem_wait(write_lock);
+
+        if (reader_count == 0)
+        {
+            break;
+        }
+        sem_post(write_lock);
+    }
 
     // Output to file
     output_file = fopen("output-reader-pref.txt", "a");
-    fprintf(output_file, "Writing,Number-of-readers-present:[%d]\n", reader_count);
+    fprintf(output_file, "Writing,Number-of-readers-present:[0]\n");
     fclose(output_file);
 
     // Critical section
@@ -126,6 +136,7 @@ int main(int argc, char **argv)
     if (counter_lock == SEM_FAILED)
     {
         perror("sem_open counter_lock failed");
+        cleanup_semaphores();
         return 1;
     }
 
@@ -133,7 +144,7 @@ int main(int argc, char **argv)
     if (write_lock == SEM_FAILED)
     {
         perror("sem_open write_lock failed");
-        sem_unlink("/counter_lock_sem");
+        cleanup_semaphores();
         return 1;
     }
 
@@ -141,8 +152,7 @@ int main(int argc, char **argv)
     if (read_lock == SEM_FAILED)
     {
         perror("sem_open read_lock failed");
-        sem_unlink("/counter_lock_sem");
-        sem_unlink("/write_lock_sem");
+        cleanup_semaphores();
         return 1;
     }
 
@@ -150,9 +160,7 @@ int main(int argc, char **argv)
     if (output_lock == SEM_FAILED)
     {
         perror("sem_open output_lock failed");
-        sem_unlink("/counter_lock_sem");
-        sem_unlink("/write_lock_sem");
-        sem_unlink("/read_lock_sem");
+        cleanup_semaphores();
         return 1;
     }
 
