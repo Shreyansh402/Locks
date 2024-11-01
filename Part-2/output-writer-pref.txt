@@ -1,4 +1,5 @@
 Reading,Number-of-readers-present:[1]
-Writing,Number-of-readers-present:[0]
-Writing,Number-of-readers-present:[0]
-Reading,Number-of-readers-present:[1]
+Reading,Number-of-readers-present:[2]
+Reading,Number-of-readers-present:[3]
+Reading,Number-of-readers-present:[4]
+Reading,Number-of-readers-present:[5]
