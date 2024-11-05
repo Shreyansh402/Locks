@@ -139,17 +139,17 @@ void *writer(void *arg)
     // your code here
 
     // Wait for readers to finish
-    sem_wait(write_lock);
-    // while (1)
-    // {
-    //     sem_wait(write_lock);
+    // sem_wait(write_lock);
+    while (1)
+    {
+        sem_wait(write_lock);
 
-    //     if (reader_count == 0) // Break if no readers present, otherwise wait again
-    //     {
-    //         break;
-    //     }
-    //     sem_post(write_lock);
-    // }
+        if (reader_count == 0) // Break if no readers present, otherwise wait again
+        {
+            break;
+        }
+        sem_post(write_lock);
+    }
 
     // Output to file
     output_file = fopen("output-reader-pref.txt", "a");
